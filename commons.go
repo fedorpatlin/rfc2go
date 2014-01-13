@@ -2,6 +2,8 @@
 package testrfc
 
 /*
+#cgo windows LDFLAGS: -L"d:/saprfc/rfcsdk/lib/"  -lsapnwrfc
+#cgo windows CFLAGS:  -I"D:/saprfc/rfcsdk/include" -DSAPwithUNICODE
 #cgo linux LDFLAGS: -L/home/fedor/Downloads/rfcsdk/nwrfcsdk/lib -lsapnwrfc -lsapucum
 #cgo linux CFLAGS: -I/home/fedor/Downloads/rfcsdk/nwrfcsdk/include -DSAPwithUNICODE
 #include <stdlib.h>
@@ -38,28 +40,6 @@ import (
 	"unicode/utf16"
 	"unsafe"
 )
-
-//type RfcError struct {
-//	error
-//	errstr       string
-//	rfcErrorinfo *C.RFC_ERROR_INFO
-//}
-
-//func (e RfcError) Error() string {
-//	if e.rfcErrorinfo != nil {
-//		return rfcSapUcToUtf8(&e.rfcErrorinfo.message[0], 0)
-//	}
-//	return e.errstr
-//}
-
-//func NewRfcErrorErrorinfo(ei *C.RFC_ERROR_INFO) *RfcError {
-//	err := new(RfcError)
-//	if ei == nil {
-//		return err
-//	}
-//	err.rfcErrorinfo = ei
-//	return err
-//}
 
 type SapUc struct {
 	str    *C.SAP_UC
