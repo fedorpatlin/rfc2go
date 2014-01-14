@@ -1,4 +1,4 @@
-package testrfc
+package rfc2go
 
 import (
 	"fmt"
@@ -21,20 +21,25 @@ func TestRfcGetVersion(t *testing.T) {
 }
 
 func TestOpenConnection(t *testing.T) {
-	cp := makeConnectionParameters()
-	_, err := NewRfcConnection(cp)
+	c := getRfcConnection(makeConnectionParameters())
+	err := c.Connect()
 	if err != nil {
 		t.Error(err.Error())
 	}
 }
 
 func TestRfcPing(t *testing.T) {
-	cp := makeConnectionParameters()
-	c, err := NewRfcConnection(cp)
-	if err != nil {
-		t.Error(err.Error())
+	c := getRfcConnection(makeConnectionParameters())
+	c.Connect()
+	rc := RfcPing(c)
+	if rc != nil {
+		t.Error(rc.Error())
 	}
-	RfcPing(c)
+}
+
+func getRfcConnection(cp *RfcConnectionParameters) *RfcConnection {
+	c, _ := NewRfcConnection(cp)
+	return c
 }
 
 func makeConnectionParameters() *RfcConnectionParameters {

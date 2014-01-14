@@ -1,9 +1,9 @@
 // testrfc project testrfc.go
-package testrfc
+package rfc2go
 
 /*
 #cgo windows LDFLAGS: -L"d:/saprfc/rfcsdk/lib/"  -lsapnwrfc
-#cgo windows CFLAGS:  -I"D:/saprfc/rfcsdk/include" -DSAPwithUNICODE
+#cgo windows CFLAGS:  -I"D:/saprfc/rfcsdk/include" -DSAPwithUNICODE -DSAPOnNT
 #cgo linux LDFLAGS: -L/home/fedor/Downloads/rfcsdk/nwrfcsdk/lib -lsapnwrfc -lsapucum
 #cgo linux CFLAGS: -I/home/fedor/Downloads/rfcsdk/nwrfcsdk/include -DSAPwithUNICODE
 #include <stdlib.h>
@@ -75,7 +75,7 @@ func rfcUtf16ToSapUc(ustr []uint16) *C.SAP_UC {
 //разобраться с этим мусором
 func rfcUtf8ToSapUc(s string) (*C.SAP_UC, uint, *RfcError) {
 	var ucsize, uclength C.unsigned
-	var ei rfcErrorInfo
+	var ei = new(rfcErrorInfo)
 	var cs *C.char
 	cs = (*C.char)(C.CString(s))
 	defer C.free(unsafe.Pointer(cs))
@@ -86,9 +86,9 @@ func rfcUtf8ToSapUc(s string) (*C.SAP_UC, uint, *RfcError) {
 	result := (*C.SAP_UC)(unsafe.Pointer(&sapstring[0]))
 
 	rc := C.RfcUTF8ToSAPUC(C.pchar_to_prfc_byte(cs), C.uint(len(s)), result, &ucsize, &uclength, &ei.Errorinfo)
-	if RFC_RC[rc] != "RFC_OK" {
+	if RFC_OK != rc {
 		var err *RfcError
-		err = NewRfcErrorErrorinfo(&ei.Errorinfo)
+		err = NewRfcErrorErrorinfo(ei)
 		return nil, 0, err
 	}
 	return result, uint(uclength), nil
@@ -126,7 +126,7 @@ func rfcSapUcToUtf8(ucstr *C.SAP_UC, length uint) string {
 	utf8buf = make([]byte, utf8bufsize)
 	utf8bufp := (*C.RFC_BYTE)(unsafe.Pointer(&utf8buf[0]))
 	rc := C.RfcSAPUCToUTF8(ucstr, C.unsigned(uclength), utf8bufp, (*C.unsigned)(unsafe.Pointer(&utf8bufsize)), (*C.unsigned)(unsafe.Pointer(&utf8length)), &err.Errorinfo)
-	if RFC_RC[rc] != "RFC_OK" {
+	if RFC_OK != rc {
 		return ""
 	}
 	out := string(utf8buf[:utf8length])
@@ -134,14 +134,12 @@ func rfcSapUcToUtf8(ucstr *C.SAP_UC, length uint) string {
 }
 
 func RfcInit() error {
-	os.Setenv("SAP_CODEPAGE", "4103")
+	os.Setenv("SAP_CODEPAGE", "4103") //SAP Note 1021459
 	var rc C.RFC_RC
 	rc = C.RfcInit()
 	if rc != C.RFC_OK {
-		//		fmt.Println("Error while initializing library")
 		err := RfcError{errstr: "Error while initializing library"}
 		return err
-		//os.Exit(-1)
 	}
 	return nil
 }

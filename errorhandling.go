@@ -1,4 +1,4 @@
-package testrfc
+package rfc2go
 
 /*
 #include "sapnwrfc.h"
@@ -9,32 +9,39 @@ type rfcErrorInfo struct {
 	Errorinfo C.RFC_ERROR_INFO
 }
 
+func (ei *rfcErrorInfo) String() string {
+	return rfcSapUcToUtf8(&ei.Errorinfo.message[0], 0)
+}
+
 type RfcError struct {
 	error
-	errstr       string
-	rfcErrorinfo *C.RFC_ERROR_INFO
+	errstr string
+	//	rfcErrorinfo *C.RFC_ERROR_INFO
 }
 
 func (e RfcError) Error() string {
-	if e.rfcErrorinfo != nil {
-		return rfcSapUcToUtf8(&e.rfcErrorinfo.message[0], 0)
-	}
 	return e.errstr
 }
 
-func NewRfcErrorErrorinfo(ei *C.RFC_ERROR_INFO) *RfcError {
+func NewRfcErrorErrorinfo(ei *rfcErrorInfo) *RfcError {
 	err := new(RfcError)
 	if ei == nil {
 		return err
 	}
-	err.rfcErrorinfo = ei
+	//	err.rfcErrorinfo = ei.Errorinfo
+	err.SetErrorInfo(ei)
 	return err
 }
 
-var RFC_RC = map[C.RFC_RC]string{
-	C.RFC_OK: "RFC_OK",
+func (e *RfcError) SetErrorInfo(ei *rfcErrorInfo) {
+	if ei != nil {
+		e.errstr = ei.String()
+	}
 }
 
-type RfcRc struct {
-	rc C.RFC_RC
-}
+const (
+	RFC_OK                    = C.RFC_OK
+	RFC_COMMUNICATION_FAILURE = C.RFC_COMMUNICATION_FAILURE
+	RFC_LOGON_FAILURE         = C.RFC_LOGON_FAILURE
+	RFC_ABAP_RUNTIME_FAILURE  = C.RFC_ABAP_RUNTIME_FAILURE
+)

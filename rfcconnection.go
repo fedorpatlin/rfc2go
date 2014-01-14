@@ -1,4 +1,4 @@
-package testrfc
+package rfc2go
 
 /*
 #include "sapnwrfc.h"
@@ -11,8 +11,7 @@ import (
 )
 
 type rfcConnectionHandle struct {
-	h    C.RFC_CONNECTION_HANDLE
-	open bool
+	h C.RFC_CONNECTION_HANDLE
 }
 
 type rfcAttributes struct {
@@ -20,25 +19,32 @@ type rfcAttributes struct {
 }
 
 type RfcConnection struct {
-	pms        RfcConnectionParameters
+	pms        *RfcConnectionParameters
 	Handle     rfcConnectionHandle
 	Attributes rfcAttributes
+	Opened     bool
 }
 
 //todo fill ConnectionAttributes
 //todo add error checks
 func NewRfcConnection(cp *RfcConnectionParameters) (*RfcConnection, *RfcError) {
-	ei := new(rfcErrorInfo)
 	con := new(RfcConnection)
-	h := C.RfcOpenConnection((*C.RFC_CONNECTION_PARAMETER)(unsafe.Pointer(&cp.cparameters[0])), C.unsigned(cp.count), &ei.Errorinfo)
+	con.pms = cp
+	con.Opened = false
+	return con, nil
+}
+
+func (c *RfcConnection) Connect() *RfcError {
+	ei := new(rfcErrorInfo)
+	h := C.RfcOpenConnection((*C.RFC_CONNECTION_PARAMETER)(unsafe.Pointer(&c.pms.cparameters[0])), C.unsigned(c.pms.count), &ei.Errorinfo)
 	if h == nil {
-		err := NewRfcErrorErrorinfo(&ei.Errorinfo)
-		return nil, err
+		err := NewRfcErrorErrorinfo(ei)
+		return err
 
 	}
-	con.Handle.h = h
-	con.Handle.open = true
-	return con, nil
+	c.Handle.h = h
+	c.Opened = false
+	return nil
 }
 
 type RfcConnectionParameters struct {
@@ -64,13 +70,14 @@ func (cp *RfcConnectionParameters) add(name, value string) error {
 	return nil
 }
 
-func RfcPing(c *RfcConnection) error {
-	if c != nil {
+func RfcPing(c *RfcConnection) *RfcError {
+	if c.Opened == true {
 		h := c.Handle
-		err := new(rfcErrorInfo)
-		C.RfcPing(h.h, &err.Errorinfo)
-		return nil
+		ei := new(rfcErrorInfo)
+		rc := C.RfcPing(h.h, &ei.Errorinfo)
+		if RFC_OK != rc {
+			return NewRfcErrorErrorinfo(ei)
+		}
 	}
-	//fmt.Println("no connections established")
 	return nil
 }
