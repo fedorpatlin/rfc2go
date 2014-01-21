@@ -13,6 +13,11 @@ func (ei *rfcErrorInfo) String() string {
 	return rfcSapUcToUtf8(&ei.Errorinfo.message[0], 0)
 }
 
+func NewRfcErrorInfo() *rfcErrorInfo {
+	ei := new(rfcErrorInfo)
+	return ei
+}
+
 type RfcError struct {
 	error
 	errstr string
@@ -44,4 +49,5 @@ const (
 	RFC_COMMUNICATION_FAILURE = C.RFC_COMMUNICATION_FAILURE
 	RFC_LOGON_FAILURE         = C.RFC_LOGON_FAILURE
 	RFC_ABAP_RUNTIME_FAILURE  = C.RFC_ABAP_RUNTIME_FAILURE
+	RFC_EXTERNAL_FAILURE      = C.RFC_EXTERNAL_FAILURE
 )

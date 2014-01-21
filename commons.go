@@ -78,13 +78,14 @@ func rfcUtf8ToSapUc(s string) (*C.SAP_UC, uint, *RfcError) {
 	var ei = new(rfcErrorInfo)
 	var cs *C.char
 	cs = (*C.char)(C.CString(s))
-	defer C.free(unsafe.Pointer(cs))
+	//defer C.free(unsafe.Pointer(cs))
 	//буфер для строки *SAP_UC
 	//размер буфера для результата *SAP_UC
 	ucsize = C.uint(uint(len(s) * 2))
-	sapstring := make([]C.SAP_UC, int(ucsize))
-	result := (*C.SAP_UC)(unsafe.Pointer(&sapstring[0]))
-
+	//sapstring := make([]C.SAP_UC, int(ucsize))
+	sapstring := C.malloc(C.size_t(C.uint(2) * ucsize))
+	//result := (*C.SAP_UC)(unsafe.Pointer(&sapstring[0]))
+	result := (*C.SAP_UC)(sapstring)
 	rc := C.RfcUTF8ToSAPUC(C.pchar_to_prfc_byte(cs), C.uint(len(s)), result, &ucsize, &uclength, &ei.Errorinfo)
 	if RFC_OK != rc {
 		var err *RfcError
@@ -135,6 +136,7 @@ func rfcSapUcToUtf8(ucstr *C.SAP_UC, length uint) string {
 
 func RfcInit() error {
 	os.Setenv("SAP_CODEPAGE", "4103") //SAP Note 1021459
+	os.Setenv("RFC_TRACE", "3")
 	var rc C.RFC_RC
 	rc = C.RfcInit()
 	if rc != C.RFC_OK {
@@ -163,7 +165,3 @@ func RfcGetVersion() (*RfcVersion, error) {
 	ver.patch = uint(patch)
 	return ver, nil
 }
-
-//func init() {
-//	os.Setenv("SAP_CODEPAGE", "4103")
-//}
