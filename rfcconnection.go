@@ -15,6 +15,8 @@ static uint mycpy (SAP_UC* to, SAP_UC* from, unsigned len){
 	return c;
 }
 
+extern RFC_RC cb(void * data);
+
 extern RFC_RC Cbcall(SAP_UC* p0,
 				   SAP_UC* p1,
 				   SAP_UC* p2,
@@ -69,6 +71,7 @@ func NewRfcConnection(cp *RfcConnectionParameters) (*RfcConnection, *RfcError) {
 
 func (c *RfcConnection) Open() *RfcError {
 	ei := new(rfcErrorInfo)
+	fmt.Printf("param name %s , value %s\n", NewSapUc(c.pms.cparameters[2].name, 0), NewSapUc(c.pms.cparameters[2].value, 0))
 	h := C.RfcOpenConnection((*C.RFC_CONNECTION_PARAMETER)(unsafe.Pointer(&c.pms.cparameters[0])), C.unsigned(c.pms.count), &ei.Errorinfo)
 	if h == nil {
 		err := NewRfcErrorErrorinfo(ei)
@@ -76,6 +79,7 @@ func (c *RfcConnection) Open() *RfcError {
 	}
 	c.Handle = NewRfcConnectionHandle(h)
 	c.Opened = true
+
 	return nil
 }
 
@@ -122,8 +126,8 @@ func (cp *RfcConnectionParameters) Add(name, value string) error {
 	cp.Parameters[name] = value
 	var sapname = NewSapUcFromString(name)
 	var sapvalue = NewSapUcFromString(value)
-	cp.cparameters[cp.count].name = sapname.str
-	cp.cparameters[cp.count].value = sapvalue.str
+	cp.cparameters[cp.count].name = &(sapname.str)[0]
+	cp.cparameters[cp.count].value = &(sapvalue.str)[0]
 	cp.count++
 	return nil
 }
@@ -142,15 +146,18 @@ func RfcPing(c *RfcConnection) *RfcError {
 	return nil
 }
 
+//export cb
+func cb(data unsafe.Pointer) C.RFC_RC {
+	return RFC_OK
+}
+
 //export Cbcall
 func Cbcall(sysid, user, client, password *C.SAP_UC, pwlen C.unsigned, newpassword *C.SAP_UC, newpwlen C.unsigned, ei *C.RFC_ERROR_INFO) C.RFC_RC {
 	fmt.Println("callback called")
 	npwd := NewSapUcFromString("987654321")
 	pwd := NewSapUcFromString("123456789")
-	b := C.mycpy(password, pwd.str, C.unsigned(pwd.length))
-	fmt.Printf("%v bytes copied\n", b)
-	b = C.mycpy(newpassword, npwd.str, C.unsigned(npwd.length))
-	fmt.Printf("password is %s\n", rfcSapUcToUtf8(password, 0))
+	copy(*(*[]C.SAP_UC)(unsafe.Pointer(password)), pwd.str)
+	copy(*(*[]C.SAP_UC)(unsafe.Pointer(newpassword)), npwd.str)
 	pwlen = C.unsigned(pwd.length)
 	newpwlen = C.unsigned(npwd.length)
 	go func(v1, v2 *C.SAP_UC, v3, v4 C.unsigned) {

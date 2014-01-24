@@ -5,12 +5,15 @@ package rfc2go
 */
 import "C"
 
+//import "unsafe"
+
 type rfcErrorInfo struct {
 	Errorinfo C.RFC_ERROR_INFO
 }
 
 func (ei *rfcErrorInfo) String() string {
-	return rfcSapUcToUtf8(&ei.Errorinfo.message[0], 0)
+	suc := NewSapUc(&ei.Errorinfo.message[0], 0)
+	return rfcSapUcToUtf8(suc)
 }
 
 func NewRfcErrorInfo() *rfcErrorInfo {

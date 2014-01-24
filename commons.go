@@ -36,19 +36,59 @@ unsigned rfcuclength(SAP_UC *str){
 import "C"
 
 import (
+	//	"fmt"
 	"os"
 	"unicode/utf16"
 	"unsafe"
 )
 
 type SapUc struct {
-	str    *C.SAP_UC
+	str    []C.SAP_UC
 	length uint
 }
 
+func zerosapchar() C.SAP_UC {
+	var c C.SAP_UC
+	l := unsafe.Sizeof(c)
+	b := make([]byte, l)
+	for i, _ := range b {
+		b[i] = 0x0
+	}
+	c = *(*C.SAP_UC)(unsafe.Pointer(&b[0]))
+	return c
+}
+
+func sapstrlen(sapstr *C.SAP_UC) ([]C.SAP_UC, uint) {
+	zero := zerosapchar()
+	sapstrbuf := (*[1000]C.SAP_UC)(unsafe.Pointer(sapstr))
+	//	fmt.Printf("received %v\n", sapstr)
+	for i, v := range *sapstrbuf {
+		if v == zero {
+			return sapstrbuf[:i+1], uint(i + 1)
+		}
+	}
+	return make([]C.SAP_UC, 0), 0
+}
+
+func sapstrng(str *C.SAP_UC, strlen int) []C.SAP_UC {
+	sapstrbuf := (*[1000]C.SAP_UC)(unsafe.Pointer(str))
+	return sapstrbuf[:strlen+1]
+}
+
 func NewSapUc(str *C.SAP_UC, length uint) *SapUc {
+	if str == nil {
+		return nil
+	}
 	s := new(SapUc)
-	s.str = str
+	var sapstr []C.SAP_UC
+	if length == 0 {
+		sapstr, length = sapstrlen(str)
+	} else {
+		sapstr = sapstrng(str, int(length))
+	}
+	s.str = make([]C.SAP_UC, int(length))
+	copy(s.str, sapstr)
+	//fmt.Printf("array %v of %d items\n", sapstr, length)
 	s.length = length
 	return s
 }
@@ -56,15 +96,15 @@ func NewSapUc(str *C.SAP_UC, length uint) *SapUc {
 func NewSapUcFromString(str string) *SapUc {
 	s := new(SapUc)
 	var err *RfcError
-	s.str, s.length, err = rfcUtf8ToSapUc(str)
+	s = rfcUtf8ToSapUc(str)
 	if err != nil {
 		return nil
 	}
 	return s
 }
 
-func (s *SapUc) string() string {
-	return rfcSapUcToUtf8(s.str, s.length)
+func (s *SapUc) String() string {
+	return rfcSapUcToUtf8(s)
 }
 
 func rfcUtf16ToSapUc(ustr []uint16) *C.SAP_UC {
@@ -73,26 +113,21 @@ func rfcUtf16ToSapUc(ustr []uint16) *C.SAP_UC {
 }
 
 //разобраться с этим мусором
-func rfcUtf8ToSapUc(s string) (*C.SAP_UC, uint, *RfcError) {
+func rfcUtf8ToSapUc(s string) *SapUc {
 	var ucsize, uclength C.unsigned
 	var ei = new(rfcErrorInfo)
-	var cs *C.char
-	cs = (*C.char)(C.CString(s))
-	//defer C.free(unsafe.Pointer(cs))
+	cs := (*C.RFC_BYTE)(unsafe.Pointer(C.CString(s)))
+	defer C.free(unsafe.Pointer(cs))
 	//буфер для строки *SAP_UC
 	//размер буфера для результата *SAP_UC
 	ucsize = C.uint(uint(len(s) * 2))
-	//sapstring := make([]C.SAP_UC, int(ucsize))
-	sapstring := C.malloc(C.size_t(C.uint(2) * ucsize))
-	//result := (*C.SAP_UC)(unsafe.Pointer(&sapstring[0]))
-	result := (*C.SAP_UC)(sapstring)
-	rc := C.RfcUTF8ToSAPUC(C.pchar_to_prfc_byte(cs), C.uint(len(s)), result, &ucsize, &uclength, &ei.Errorinfo)
+	sapstring := make([]C.SAP_UC, int(ucsize))
+	result := (*C.SAP_UC)(unsafe.Pointer(&sapstring[0]))
+	rc := C.RfcUTF8ToSAPUC(cs, C.uint(len(s)), result, &ucsize, &uclength, &ei.Errorinfo)
 	if RFC_OK != rc {
-		var err *RfcError
-		err = NewRfcErrorErrorinfo(ei)
-		return nil, 0, err
+		return nil
 	}
-	return result, uint(uclength), nil
+	return NewSapUc(result, 0)
 }
 
 func trydecode(str *C.SAP_UC, l uint) string {
@@ -111,26 +146,24 @@ func trydecode(str *C.SAP_UC, l uint) string {
 	return string(utf16.Decode(buf))
 }
 
-func rfcSapUcToUtf8(ucstr *C.SAP_UC, length uint) string {
-	var uclength, utf8bufsize, utf8length uint
-	var err rfcErrorInfo
-	var utf8buf []byte
-	if length != 0 {
-		uclength = length
-	} else {
-		uclength = uint(C.rfcuclength(ucstr))
-		if uclength == 0 {
-			return ""
-		}
+func rfcSapUcToUtf8(ucstr *SapUc) string {
+	if ucstr == nil || ucstr.length == 0 {
+		return ""
 	}
+	var uclength, utf8bufsize, utf8length uint
+	err := new(rfcErrorInfo)
+	uclength = ucstr.length
 	utf8bufsize = uclength * 2
-	utf8buf = make([]byte, utf8bufsize)
-	utf8bufp := (*C.RFC_BYTE)(unsafe.Pointer(&utf8buf[0]))
-	rc := C.RfcSAPUCToUTF8(ucstr, C.unsigned(uclength), utf8bufp, (*C.unsigned)(unsafe.Pointer(&utf8bufsize)), (*C.unsigned)(unsafe.Pointer(&utf8length)), &err.Errorinfo)
+	utf8buf := make([]byte, utf8bufsize)
+
+	utf8bufp := (*C.RFC_BYTE)(&utf8buf[0])
+
+	rc := C.RfcSAPUCToUTF8(&ucstr.str[0], C.unsigned(uclength), utf8bufp, (*C.unsigned)(unsafe.Pointer(&utf8bufsize)), (*C.unsigned)(unsafe.Pointer(&utf8length)), &err.Errorinfo)
 	if RFC_OK != rc {
 		return ""
 	}
-	out := string(utf8buf[:utf8length])
+	//fmt.Printf("utf8buffer %v of len %d\n", utf8buf[:utf8length], utf8length)
+	out := string(utf8buf[:utf8length-1])
 	return out
 }
 
@@ -159,7 +192,7 @@ func RfcGetVersion() (*RfcVersion, error) {
 		err := RfcError{errstr: "Error getting library version"}
 		return nil, err
 	}
-	ver.VersionString = rc.string()
+	ver.VersionString = rc.String()
 	ver.maj = uint(maj)
 	ver.min = uint(min)
 	ver.patch = uint(patch)
